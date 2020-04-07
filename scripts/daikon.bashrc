@@ -8,6 +8,8 @@
 ##        files to .class files but have not re-made the daikon.jar file.
 ## You should not need to edit this file.
 
+
+
 if [ "$(uname)" = "Darwin" ] ; then
   export JAVA_HOME=${JAVA_HOME:-$(/usr/libexec/java_home)}
 else
@@ -71,3 +73,4 @@ if [ $PERLLIB ]; then
 else
   export PERLLIB=${DAIKONSCRIPTS}:${PLUMESCRIPTS}
 fi
+

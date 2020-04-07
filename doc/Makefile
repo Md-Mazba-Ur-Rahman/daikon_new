@@ -108,7 +108,7 @@ developer/index.html: developer.texinfo ../utils/html-tools
 	cp images/*.jpg developer/images
 	${HTMLTOOLS}/html-add-favicon developer ../daikon-favicon.png
 
-pdf: daikon.pdf images/dfepl-flow.eps developer.pdf
+pdf: #daikon.pdf images/dfepl-flow.eps developer.pdf
 
 daikon.pdf: daikon.texinfo config-options.texinfo invariants-doc.texinfo
 	makeinfo --pdf $<
