@@ -819,6 +819,7 @@ public final class PrintInvariants {
   public static void print_invariants_maybe(PptTopLevel ppt, PrintWriter out, PptMap all_ppts) {
 
     debugPrint.fine("Considering printing ppt " + ppt.name() + ", samples = " + ppt.num_samples());
+    debugPrint.fine("ppt_regexp: " + ppt_regexp);
 
     // Skip this ppt if it doesn't match ppt regular expression
     if ((ppt_regexp != null) && !ppt_regexp.matcher(ppt.name()).find()) {
