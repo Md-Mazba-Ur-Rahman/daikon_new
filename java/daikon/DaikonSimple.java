@@ -107,6 +107,9 @@ public class DaikonSimple {
     Set<File> decls_files = files.decls;
     Set<String> dtrace_files = files.dtrace;
 
+    // Set up debug traces; note this comes after reading command line options.
+    LogHelper.setupLogs(Global.debugAll ? LogHelper.FINE : LogHelper.INFO);
+
     if ((decls_files.size() == 0) && (dtrace_files.size() == 0)) {
       throw new Daikon.UserError("No .decls or .dtrace files specified");
     }
