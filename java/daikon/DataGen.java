@@ -41,9 +41,9 @@ import org.checkerframework.dataflow.qual.Pure;
 public class DataGen {
 
   // logging information
-  public static final Logger debug = Logger.getLogger("daikon.DaikonSimple");
+  public static final Logger debug = Logger.getLogger("daikon.DataGen");
 
-  public static final Logger debug_detail = Logger.getLogger("daikon.DaikonSimple.Detail");
+  public static final Logger debug_detail = Logger.getLogger("daikon.DataGen.Detail");
 
   // // inv file for storing the invariants in serialized form
   // public static File inv_file = null;
@@ -52,7 +52,7 @@ public class DataGen {
       String.join(
           lineSep,
           "",
-          "Usage: java daikon.DaikonSimple [OPTION]... <decls_file> <dtrace_file>",
+          "Usage: java daikon.DataGen [OPTION]... <decls_file> <dtrace_file>",
           "  -h, --" + Daikon.help_SWITCH,
           "      Display this usage message",
           // "  -o, <inv_file> ",
@@ -650,6 +650,7 @@ public class DataGen {
               assert vt.getValue(vi) != null : vi;
             }
             if (inv.ppt instanceof PptSlice2) assert inv.ppt.var_infos.length == 2;
+            debug.fine("add a sample for " + inv);
             InvariantStatus status = inv.add_sample(vt, 1);
             if (status == InvariantStatus.FALSIFIED) {
               k.remove();
