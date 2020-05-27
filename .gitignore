@@ -518,3 +518,7 @@ scripts/dockerdir/
 
 *.decls-DynComp
 examples/java-examples/simple/simple_code.txt
+
+GTAGS
+GRTAGS
+GPATH
