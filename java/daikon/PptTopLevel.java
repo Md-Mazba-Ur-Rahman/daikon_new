@@ -231,6 +231,7 @@ public class PptTopLevel extends Ppt {
   // These used to appear in Ppt, were moved down to PptToplevel
   public final String name;
   public final PptName ppt_name;
+  public final String csv_file_name;
 
   @Pure
   @Override
@@ -414,6 +415,14 @@ public class PptTopLevel extends Ppt {
       name += ":::" + type;
     }
     this.ppt_name = new PptName(name);
+
+    this.csv_file_name =
+        name.replaceAll("\\.", "_")
+                .replaceAll("\\(", "_")
+                .replaceAll("\\)", "_")
+                .replaceAll(":::", "")
+            + ".csv";
+
     this.flags = flags;
     this.type = type;
     this.parent_relations = parents;
@@ -439,6 +448,12 @@ public class PptTopLevel extends Ppt {
     super(var_infos);
     this.name = name;
     ppt_name = new PptName(name);
+    this.csv_file_name =
+        name.replaceAll("\\.", "_")
+                .replaceAll("\\(", "_")
+                .replaceAll("\\)", "_")
+                .replaceAll(":::", "")
+            + ".csv";
     init_vars();
   }
 
