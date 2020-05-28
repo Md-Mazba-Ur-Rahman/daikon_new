@@ -67,6 +67,8 @@ public class DataGen {
   // a pptMap that contains all the program points
   public static PptMap all_ppts;
 
+  public static InvIDManager invIDMan = new InvIDManager();
+
   public static void main(final String[] args) throws IOException, FileNotFoundException {
 
     try {
@@ -554,12 +556,11 @@ public class DataGen {
      * the invariant and removing the invariant if it is falsified.
      */
     private void add(PptTopLevel ppt, ValueTuple vt, int nonce) {
-      debug.fine("[" + ppt.ppt_name + "] add a value tuple: " + vt);
+
+      List<PredValPair> row = new ArrayList<>();
 
       // if this is a numbered exit, apply to the combined exit as well
       if (ppt.ppt_name.isNumberedExitPoint()) {
-
-        debug.fine(ppt.ppt_name + " is a numbered exit");
 
         // Daikon.create_combined_exits(all_ppts);
         PptTopLevel parent = all_ppts.get(ppt.ppt_name.makeExit());
@@ -650,9 +651,12 @@ public class DataGen {
               assert vt.getValue(vi) != null : vi;
             }
             if (inv.ppt instanceof PptSlice2) assert inv.ppt.var_infos.length == 2;
-            debug.fine("add a sample for " + inv);
             InvariantStatus status = inv.add_sample(vt, 1);
+            debug.fine(inv + ": " + status + " at " + ppt.name);
+            debug.fine("csv file: " + ppt.csv_file_name);
+            // CSVWriter csv_writer = new CSVWriter(new FileWriter(new File(ppt.csv_file_name)));
             if (status == InvariantStatus.FALSIFIED) {
+              row.add(new PredValPair(inv, false));
               k.remove();
             }
           }
@@ -669,6 +673,24 @@ public class DataGen {
         }
         ppt.mbtracker.add(vt, 1);
       }
+
+      // write a row to a csv file
+      for (PredValPair p : row) {
+        debug.fine("write " + invIDMan.getID(p.pred()) + ": " + p);
+      }
+    }
+  }
+
+  public static class InvIDManager {
+    Map<Invariant, Integer> id_map = new LinkedHashMap<>();
+    int last_id = 0;
+
+    int getID(Invariant inv) {
+      Integer id = id_map.get(inv);
+      if (id != null) return id;
+
+      id_map.put(inv, last_id);
+      return last_id++;
     }
   }
 }
