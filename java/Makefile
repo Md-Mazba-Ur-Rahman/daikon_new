@@ -72,6 +72,9 @@ ifneq "$(wildcard ${JAVA_HOME}/jre/lib/rt.jar)" ""
   DAIKON_CLASSPATH := $(DAIKON_CLASSPATH):${JAVA_HOME}/jre/lib/rt.jar
 endif
 
+## Add commons-csv
+DAIKON_CLASSPATH := $(DAIKON_CLASSPATH):${DAIKONDIR}/java/commons-csv-1.8.jar:${DAIKONDIR}/java/commons-csv-1.8-sources.jar
+
 # -docletpath doesn't seem to respect path wildcards as -cp does
 DOCLETPATH := $(wildcard ${DAIKONDIR}/java/lib/plume-util-*.jar):$(wildcard ${DAIKONDIR}/java/lib/bcel-util-*.jar):$(wildcard ${DAIKONDIR}/java/lib/reflection-util-*.jar):$(wildcard ${DAIKONDIR}/java/lib/require-javadoc-*.jar):${DAIKON_CLASSPATH}:${DAIKONDIR}/java/lib/daikon-plumelib.jar
 
@@ -401,7 +404,7 @@ xlint: chicory ${ALL_GENERATED_FILES}
 # always recompile, whether recompilation is necessary or not.  (Why?)
 all_directly: ../utils/plume-scripts ${AUTO_GENERATED_FILES} java_files.txt
 # # If SplitterFactoryTestUpdater.java is newer than SplitterFactoryTest.java, then delete the latter.
-# 	if [ daikon/test/split/SplitterFactoryTestUpdater.java -nt daikon/test/split/SplitterFactoryTest.java ] ; then rm -f daikon/test/split/SplitterFactoryTest.java; fi
+#	if [ daikon/test/split/SplitterFactoryTestUpdater.java -nt daikon/test/split/SplitterFactoryTest.java ] ; then rm -f daikon/test/split/SplitterFactoryTest.java; fi
 	rm -f `find daikon -name "*.class" -print`
 	echo "CLASSPATH = ${CLASSPATH}"
 	echo "DAIKON_CLASSPATH = ${DAIKON_CLASSPATH}"
@@ -684,13 +687,13 @@ errorprone-nocompile:
 	${MAKE} lib/tmp/${ERRORPRONE_JAR_FILE}
 	java -cp ${DAIKON_CLASSPATH} -Xbootclasspath/p:${ERRORPRONE_JAR_PATH} com.google.errorprone.ErrorProneCompiler -Werror -Xmaxwarns 100000 -Xep:ReferenceEquality:OFF -Xep:StringSplitter:OFF ${JAVA_FILES_FOR_STYLE}
 ## For 2.3.2 and later (but it isn't working for me):
-# 	javac \
-# 	  -J-Xbootclasspath/p:javac-9+181-r4173-1.jar \
-# 	  -XDcompilePolicy=simple \
-# 	  -processorpath ${DAIKONDIR}/java/lib/tmp/${ERRORPRONE_JAR_FILE}:${DAIKONDIR}/java/lib/tmp/dataflow-2.5.7.jar:${DAIKONDIR}/java/lib/tmp/javacutil-2.5.7.jar:${DAIKONDIR}/java/lib/tmp/jFormatString-3.0.0.jar \
-# 	  '-Xplugin:ErrorProne -Xep:ReferenceEquality:OFF -Xep:StringSplitter:OFF' \
-# 	  -Xmaxwarns 100000  \
-# 	  ${JAVA_FILES_FOR_STYLE}
+#	javac \
+#	  -J-Xbootclasspath/p:javac-9+181-r4173-1.jar \
+#	  -XDcompilePolicy=simple \
+#	  -processorpath ${DAIKONDIR}/java/lib/tmp/${ERRORPRONE_JAR_FILE}:${DAIKONDIR}/java/lib/tmp/dataflow-2.5.7.jar:${DAIKONDIR}/java/lib/tmp/javacutil-2.5.7.jar:${DAIKONDIR}/java/lib/tmp/jFormatString-3.0.0.jar \
+#	  '-Xplugin:ErrorProne -Xep:ReferenceEquality:OFF -Xep:StringSplitter:OFF' \
+#	  -Xmaxwarns 100000  \
+#	  ${JAVA_FILES_FOR_STYLE}
 # To create a patch file to apply changes:
 #	\rm -f ${DAIKONDIR}/java/error-prone.patch && java -Xbootclasspath/p:${ERRORPRONE_JAR_PATH} com.google.errorprone.ErrorProneCompiler -Xmaxwarns 100000 -XepPatchChecks:MissingOverride,DefaultCharset,DeadException -XepPatchLocation:${DAIKONDIR}/java ${JAVA_FILES_FOR_STYLE}
 # This didn't create the file though its output claimed it did:
@@ -702,12 +705,12 @@ lib/tmp/${ERRORPRONE_JAR_FILE}:
 
 # For 2.3.2 and later:
 # lib/tmp/${ERRORPRONE_JAR_FILE}:
-# 	mkdir -p lib/tmp
-# 	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/com/google/errorprone/error_prone_core/${ERRORPRONE_VERSION}/${ERRORPRONE_JAR_FILE}
-# 	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/org/checkerframework/dataflow/2.5.7/dataflow-2.5.7.jar
-# 	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/org/checkerframework/javacutil/2.5.7/javacutil-2.5.7.jar
-# 	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/com/google/code/findbugs/jFormatString/3.0.0/jFormatString-3.0.0.jar
-# 	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/com/google/errorprone/javac/9+181-r4173-1/javac-9+181-r4173-1.jar
+#	mkdir -p lib/tmp
+#	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/com/google/errorprone/error_prone_core/${ERRORPRONE_VERSION}/${ERRORPRONE_JAR_FILE}
+#	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/org/checkerframework/dataflow/2.5.7/dataflow-2.5.7.jar
+#	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/org/checkerframework/javacutil/2.5.7/javacutil-2.5.7.jar
+#	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/com/google/code/findbugs/jFormatString/3.0.0/jFormatString-3.0.0.jar
+#	cd lib/tmp && curl -s -O --retry 3 https://repo1.maven.org/maven2/com/google/errorprone/javac/9+181-r4173-1/javac-9+181-r4173-1.jar
 
 findbugs: .findbugs-output
 .PHONY: findbugs
@@ -967,15 +970,15 @@ nullness-counts:
 	@echo ${NULLNESS_JAVA_FILES} | xargs sclc | tail -1
 	@echo -n "Total files (lines, blank, comments, NCSL, AESL): "
 	@echo ${DAIKON_JAVA_FILES} | xargs sclc | tail -1
-# 	@echo -n "Annotated files: "
-# 	@echo ${NULLNESS_JAVA_FILES} | sed 's/ /\n/g' | wc -l
-# 	@echo -n " / "
-# 	@echo ${DAIKON_JAVA_FILES} | sed 's/ /\n/g' | wc -l
+#	@echo -n "Annotated files: "
+#	@echo ${NULLNESS_JAVA_FILES} | sed 's/ /\n/g' | wc -l
+#	@echo -n " / "
+#	@echo ${DAIKON_JAVA_FILES} | sed 's/ /\n/g' | wc -l
 # #	@echo ${NULLNESS_JAVA_FILES}
-# 	@echo -n "Lines in annotated files: "
-# 	@echo ${NULLNESS_JAVA_FILES} | xargs wc -l | tail -1 | cut -d ' ' -f 2
-# 	@echo -n " / "
-# 	@echo ${DAIKON_JAVA_FILES} | xargs wc -l | tail -1 | cut -d ' ' -f 2
+#	@echo -n "Lines in annotated files: "
+#	@echo ${NULLNESS_JAVA_FILES} | xargs wc -l | tail -1 | cut -d ' ' -f 2
+#	@echo -n " / "
+#	@echo ${DAIKON_JAVA_FILES} | xargs wc -l | tail -1 | cut -d ' ' -f 2
 	@echo -n "Lines with nullness annotations: "
 	@grep '@AssertNonNullIfFalse\|@AssertNonNullIfTrue\|@AssertParametersNonNull\|@KeyFor\|@LazyNonNull\|@NonNull\|@NonNullOnEntry\|@Nullable\|@PolyNull\|@Pure' ${NULLNESS_JAVA_FILES} | wc -l
 	@echo -n "Lines with @SuppressWarnings annotation or castNonNull method call: "
@@ -1057,12 +1060,12 @@ JAVADOC_DEST = api
 # ${DAIKONDIR}/java should not be in classpath, to avoid Javadoc error
 # "Multiple sources of package comments found for package"
 JAVADOC_FLAGS_COMMON = -breakiterator -quiet -linksource -noqualifier all \
-                -Xmaxerrs 100000 -Xmaxwarns 100000 \
-                -d $(JAVADOC_DEST) \
-                -linkoffline https://docs.oracle.com/javase/8/docs/api/ https://docs.oracle.com/javase/8/docs/api/ \
-                -classpath "$(subst ${DAIKONDIR}/java:,,${DAIKON_CLASSPATH})"
+		-Xmaxerrs 100000 -Xmaxwarns 100000 \
+		-d $(JAVADOC_DEST) \
+		-linkoffline https://docs.oracle.com/javase/8/docs/api/ https://docs.oracle.com/javase/8/docs/api/ \
+		-classpath "$(subst ${DAIKONDIR}/java:,,${DAIKON_CLASSPATH})"
 JAVADOC_FLAGS = ${JAVADOC_FLAGS_COMMON} \
-                -docletpath "${DOCLETPATH}"
+		-docletpath "${DOCLETPATH}"
 
 # Daikon packages except for util (which is just a copy of plume)
 DAIKON_PACKAGES := $(shell ls -F daikon | grep / | egrep -v 'util' \
@@ -1122,7 +1125,7 @@ requireJavadocPrivate: jar $(JAVA_FILES)
 	${JAVADOC_COMMAND} -J-Xmx2600m -J-ea $(JAVADOC_FLAGS_COMMON) \
 		-private \
 		-doclet org.plumelib.javadoc.RequireJavadoc \
-                -docletpath "${DOCLETPATH}" \
+		-docletpath "${DOCLETPATH}" \
 		@javadoc-files.txt
 	@rm -f javadoc-files.txt
 
@@ -1228,7 +1231,7 @@ ${AUTO_GENERATED_CLASSES_2}: ${AUTO_GENERATED_FILES_2}
 
 ## This would be an alternative to the above rule for ${AUTO_GENERATED_CLASSES_2}.
 # daikon/test/split/SplitterFactoryTest.class: daikon/test/split/SplitterFactoryTest.java
-# 	${JAVAC_COMMAND} $<
+#	${JAVAC_COMMAND} $<
 
 # Create the auto-generated files with jpp
 .PHONY: jpp
