@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -93,7 +95,7 @@ public class DataGen {
 
   public static String output_data_dir;
 
-  public static InvIDManager invIDMan = new InvIDManager();
+  public static InvIdManager invIdMan = new InvIdManager();
 
   public static void main(final String[] args) throws IOException, FileNotFoundException {
 
@@ -565,7 +567,8 @@ public class DataGen {
           } else if (output_data_dir_OPTION.equals(option_name)) {
             output_data_dir = Daikon.getOptarg(g);
             File dir = new File(output_data_dir);
-            if (!dir.exists()) dir.mkdir();
+            if (dir.exists()) dir.delete();
+            dir.mkdir();
           } else {
             throw new Daikon.UserError("Unknown option " + option_name + " on command line");
           }
@@ -1046,8 +1049,6 @@ public class DataGen {
      */
     private void add(PptTopLevel ppt, ValueTuple vt, int nonce) {
 
-      List<PredValPair> row = new ArrayList<>();
-
       // if this is a numbered exit, apply to the combined exit as well
       if (ppt.ppt_name.isNumberedExitPoint()) {
 
@@ -1106,6 +1107,8 @@ public class DataGen {
       // number
       ppt.incSampleNumber();
 
+      List<PredIDValPair> snapshot = new ArrayList<>();
+
       // Loop through each slice
       for (PptSlice slice : ppt.views_iterable()) {
         Iterator<Invariant> k = slice.invs.iterator();
@@ -1148,8 +1151,10 @@ public class DataGen {
             InvariantStatus status = inv.add_sample(vt, 1);
             debug.fine(inv + ": " + status + " at " + ppt.name);
             if (status == InvariantStatus.FALSIFIED) {
-              row.add(new PredValPair(inv, false));
+              snapshot.add(new PredIDValPair(invIdMan.getID(inv), 0));
               // k.remove();
+            } else {
+              snapshot.add(new PredIDValPair(invIdMan.getID(inv), -1));
             }
           }
         }
@@ -1166,6 +1171,20 @@ public class DataGen {
         ppt.mbtracker.add(vt, 1);
       }
 
+      Collections.sort(
+          snapshot,
+          new Comparator<PredIDValPair>() {
+            public int compare(PredIDValPair p1, PredIDValPair p2) {
+              return p1.pred_id() - p2.pred_id();
+            }
+          });
+
+      List<String> row = new ArrayList<>();
+      for (PredIDValPair pair : snapshot) {
+        row.add("P_" + pair.pred_id());
+        row.add(Integer.toString(pair.val()));
+      }
+
       // write a row to a csv file
       try (CSVPrinter printer =
           new CSVPrinter(
@@ -1178,7 +1197,7 @@ public class DataGen {
     }
   }
 
-  public static class InvIDManager {
+  public static class InvIdManager {
     Map<Invariant, Integer> id_map = new LinkedHashMap<>();
     int last_id = 0;
 
