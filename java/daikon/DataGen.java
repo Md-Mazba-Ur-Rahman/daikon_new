@@ -592,6 +592,11 @@ public class DataGen {
         }
       }
 
+      // ignore numbered exit poits
+      if (ppt.ppt_name.isNumberedExitPoint()) {
+        return;
+      }
+
       // If the point has no variables, skip it
       if (ppt.var_infos.length == 0) {
         // The sample should be skipped but Daikon does not do this so
@@ -657,7 +662,7 @@ public class DataGen {
             // CSVWriter csv_writer = new CSVWriter(new FileWriter(new File(ppt.csv_file_name)));
             if (status == InvariantStatus.FALSIFIED) {
               row.add(new PredValPair(inv, false));
-              k.remove();
+              // k.remove();
             }
           }
         }
@@ -676,7 +681,7 @@ public class DataGen {
 
       // write a row to a csv file
       for (PredValPair p : row) {
-        debug.fine("write " + invIDMan.getID(p.pred()) + ": " + p);
+        debug.fine("write inv ID " + invIDMan.getID(p.pred()) + ": " + p);
       }
     }
   }
