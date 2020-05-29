@@ -420,6 +420,8 @@ public class PptTopLevel extends Ppt {
         name.replaceAll("\\.", "_")
                 .replaceAll("\\(", "_LP_")
                 .replaceAll("\\)", "_RP_")
+                .replaceAll("\\[", "_LB_")
+                .replaceAll("\\]", "_RB_")
                 .replaceAll(":::", "_AT_")
             + ".csv";
 
@@ -452,6 +454,8 @@ public class PptTopLevel extends Ppt {
         name.replaceAll("\\.", "_")
                 .replaceAll("\\(", "_LP_")
                 .replaceAll("\\)", "_RP_")
+                .replaceAll("\\[", "_LB_")
+                .replaceAll("\\]", "_RB_")
                 .replaceAll(":::", "_AT_")
             + ".csv";
     init_vars();
