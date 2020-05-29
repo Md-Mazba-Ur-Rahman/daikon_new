@@ -518,6 +518,7 @@ scripts/dockerdir/
 
 *.decls-DynComp
 examples/java-examples/simple/simple_code.txt
+examples/java-examples/Tiny/data
 
 GTAGS
 GRTAGS
