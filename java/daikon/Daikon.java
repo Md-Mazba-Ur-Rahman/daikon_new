@@ -375,7 +375,7 @@ public final class Daikon {
   public static @Nullable File inv_file;
 
   // Whether we want the memory monitor activated
-  private static boolean use_mem_monitor = false;
+  public static boolean use_mem_monitor = false;
 
   /** Whether Daikon should print its version number and date. */
   public static boolean noversion_output = false;
@@ -449,10 +449,10 @@ public final class Daikon {
   // checker-framework/checker/src/org/checkerframework/checker/signature/qual/ClassGetName.java
   // .  It's a bit too lenient since we don't need to permit arrays and
   // primitives.
-  private static final String classGetNameRegex =
+  public static final String classGetNameRegex =
       "(^[A-Za-z_][A-Za-z_0-9]*(\\.[A-Za-z_][A-Za-z_0-9]*)*(\\$[A-Za-z_0-9]+)*$)|^\\[+([BCDFIJSZ]|L[A-Za-z_][A-Za-z_0-9]*(\\.[A-Za-z_][A-Za-z_0-9]*)*(\\$[A-Za-z_0-9]+)*;)$";
 
-  private static final Pattern classGetNamePattern;
+  public static final Pattern classGetNamePattern;
 
   static {
     try {
@@ -1427,7 +1427,7 @@ public final class Daikon {
    * Invariants passed on the command line with the {@code --user_defined_invariant} option. A list
    * of class names in the format required by {@link Class#forName(String)}.
    */
-  private static List<@ClassGetName String> userDefinedInvariants =
+  public static List<@ClassGetName String> userDefinedInvariants =
       new ArrayList<@ClassGetName String>();
 
   /**
@@ -2551,7 +2551,7 @@ public final class Daikon {
    * Returns the ppt name, max_ppt, that corresponds to the specified percentage of ppts (presuming
    * that only those ppts &le; max_ppt will be processed).
    */
-  private static @Nullable String setup_ppt_perc(Collection<File> decl_files, int ppt_perc) {
+  public static @Nullable String setup_ppt_perc(Collection<File> decl_files, int ppt_perc) {
 
     // Make sure the percentage is valid
     if ((ppt_perc < 1) || (ppt_perc > 100)) {

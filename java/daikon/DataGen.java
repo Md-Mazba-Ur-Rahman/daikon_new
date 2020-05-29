@@ -2,24 +2,40 @@ package daikon;
 
 import static daikon.Global.lineSep;
 
+import daikon.config.Configuration;
 import daikon.inv.Invariant;
 import daikon.inv.InvariantStatus;
+import daikon.inv.OutputFormat;
 import daikon.inv.ValueSet;
 import daikon.suppress.NIS;
+import gnu.getopt.Getopt;
+import gnu.getopt.LongOpt;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.checkerframework.checker.interning.qual.Interned;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.checker.signature.qual.ClassGetName;
 import org.checkerframework.dataflow.qual.Pure;
+import org.plumelib.util.EntryReader;
+import org.plumelib.util.RegexUtil;
+import org.plumelib.util.UtilPlume;
 
 /**
  * DaikonSimple reads a declaration file and trace file and outputs a list of likely invariants
@@ -68,6 +84,7 @@ public class DataGen {
   public static PptMap all_ppts;
 
   public static InvIDManager invIDMan = new InvIDManager();
+  public static CSVManager csvMan = new CSVManager();
 
   public static void main(final String[] args) throws IOException, FileNotFoundException {
 
@@ -104,7 +121,7 @@ public class DataGen {
     Daikon.using_DaikonSimple = true;
 
     // Read command line options
-    Daikon.FileOptions files = Daikon.read_options(args, usage);
+    Daikon.FileOptions files = DataGen.read_options(args, usage);
     // DaikonSimple does not supply nor use the spinfo_files and map_files
     Set<File> decls_files = files.decls;
     Set<String> dtrace_files = files.dtrace;
@@ -174,6 +191,463 @@ public class DataGen {
         System.out.println(inv);
       }
     }
+  }
+
+  ///////////////////////////////////////////////////////////////////////////
+  // Read in the command line options
+  // Return {decls, dtrace, spinfo, map} files.
+  protected static Daikon.FileOptions read_options(String[] args, String usage) {
+    if (args.length == 0) {
+      System.out.println("Error: no files supplied on command line.");
+      System.out.println(usage);
+      throw new Daikon.UserError();
+    }
+
+    // LinkedHashSet because it can be confusing to users if files (of the
+    // same type) are gratuitously processed in a different order than they
+    // were supplied on the command line.
+    HashSet<File> decl_files = new LinkedHashSet<>();
+    HashSet<String> dtrace_files = new LinkedHashSet<>(); // file names or "-" or "+"
+    HashSet<File> spinfo_files = new LinkedHashSet<>();
+    HashSet<File> map_files = new LinkedHashSet<>();
+
+    LongOpt[] longopts =
+        new LongOpt[] {
+          // Control output
+          new LongOpt(Daikon.help_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.no_text_output_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.format_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.show_progress_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.no_show_progress_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.noversion_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.output_num_samples_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.files_from_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.omit_from_output_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          // Control invariant detection
+          new LongOpt(Daikon.conf_limit_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.list_type_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.user_defined_invariant_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.disable_all_invariants_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.no_dataflow_hierarchy_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.suppress_redundant_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          // Process only part of the trace file
+          new LongOpt(Daikon.ppt_regexp_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.ppt_omit_regexp_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.var_regexp_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.var_omit_regexp_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          // Configuration options
+          new LongOpt(Daikon.server_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.config_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.config_option_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          // Debugging
+          new LongOpt(Daikon.debugAll_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          new LongOpt(Daikon.debug_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.track_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.disc_reason_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
+          new LongOpt(Daikon.mem_stat_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+        };
+    Getopt g = new Getopt("daikon.Daikon", args, "ho:", longopts);
+    int c;
+
+    while ((c = g.getopt()) != -1) {
+      switch (c) {
+        case 0:
+          // got a long option
+          String option_name = longopts[g.getLongind()].getName();
+
+          // Control output
+          if (Daikon.help_SWITCH.equals(option_name)) {
+            System.out.println(usage);
+            throw new Daikon.NormalTermination();
+          } else if (Daikon.no_text_output_SWITCH.equals(option_name)) {
+            Daikon.no_text_output = true;
+          } else if (Daikon.format_SWITCH.equals(option_name)) {
+            String format_name = Daikon.getOptarg(g);
+            Daikon.output_format = OutputFormat.get(format_name);
+            if (Daikon.output_format == null) {
+              throw new Daikon.UserError("Unknown output format:  --format " + format_name);
+            }
+          } else if (Daikon.show_progress_SWITCH.equals(option_name)) {
+            Daikon.show_progress = true;
+            LogHelper.setLevel("daikon.Progress", LogHelper.FINE);
+          } else if (Daikon.no_show_progress_SWITCH.equals(option_name)) {
+            Daikon.show_progress = false;
+          } else if (Daikon.noversion_SWITCH.equals(option_name)) {
+            Daikon.noversion_output = true;
+          } else if (Daikon.output_num_samples_SWITCH.equals(option_name)) {
+            Daikon.output_num_samples = true;
+          } else if (Daikon.files_from_SWITCH.equals(option_name)) {
+            String files_from_filename = Daikon.getOptarg(g);
+            try {
+              for (String filename : new EntryReader(files_from_filename)) {
+                // Ignore blank lines in file.
+                if (filename.equals("")) {
+                  continue;
+                }
+                // This code is duplicated below outside the options loop.
+                // These aren't "endsWith()" because there might be a suffix
+                // on the end (eg, a date, or ".gz").
+                File file = new File(filename);
+                if (!file.exists()) {
+                  throw new Daikon.UserError("File " + filename + " not found.");
+                }
+                if (filename.indexOf(".decls") != -1) {
+                  decl_files.add(file);
+                } else if (filename.indexOf(".dtrace") != -1) {
+                  dtrace_files.add(filename);
+                } else if (filename.indexOf(".spinfo") != -1) {
+                  spinfo_files.add(file);
+                } else if (filename.indexOf(".map") != -1) {
+                  map_files.add(file);
+                } else {
+                  throw new Daikon.UserError("Unrecognized file extension: " + filename);
+                }
+              }
+            } catch (IOException e) {
+              throw new RuntimeException(
+                  String.format("Error reading --files_from file: %s", files_from_filename));
+            }
+            break;
+          } else if (Daikon.omit_from_output_SWITCH.equals(option_name)) {
+            String f = Daikon.getOptarg(g);
+            for (int i = 0; i < f.length(); i++) {
+              if ("0rs".indexOf(f.charAt(i)) == -1) {
+                throw new Daikon.UserError(
+                    "omit_from_output flag letter '" + f.charAt(i) + "' is unknown");
+              }
+              Daikon.omit_types[f.charAt(i)] = true;
+            }
+            Daikon.omit_from_output = true;
+          }
+          // Control invariant detection
+          else if (Daikon.conf_limit_SWITCH.equals(option_name)) {
+            double limit = Double.parseDouble(Daikon.getOptarg(g));
+            if ((limit < 0.0) || (limit > 1.0)) {
+              throw new Daikon.UserError(Daikon.conf_limit_SWITCH + " must be between [0..1]");
+            }
+            Configuration.getInstance()
+                .apply("daikon.inv.Invariant.confidence_limit", String.valueOf(limit));
+          } else if (Daikon.list_type_SWITCH.equals(option_name)) {
+            try {
+              String list_type_string = Daikon.getOptarg(g);
+              ProglangType.list_implementors.add(list_type_string);
+            } catch (Exception e) {
+              throw new Daikon.UserError(
+                  "Problem parsing " + Daikon.list_type_SWITCH + " option: " + e);
+            }
+            break;
+          } else if (Daikon.user_defined_invariant_SWITCH.equals(option_name)) {
+            try {
+              String user_defined_invariant_string = Daikon.getOptarg(g);
+              Matcher m = Daikon.classGetNamePattern.matcher(user_defined_invariant_string);
+              if (!m.matches()) {
+                throw new Daikon.UserError(
+                    "Bad argument "
+                        + user_defined_invariant_string
+                        + " for "
+                        + Daikon.ppt_regexp_SWITCH
+                        + ": not in the format required by Class.getName(String)");
+              }
+              @SuppressWarnings("signature") // Regex match guarantees the format of Class.getName()
+              @ClassGetName String cname = user_defined_invariant_string;
+              Daikon.userDefinedInvariants.add(cname);
+            } catch (Exception e) {
+              throw new Daikon.UserError(
+                  "Problem parsing " + Daikon.user_defined_invariant_SWITCH + " option: " + e);
+            }
+            break;
+          } else if (Daikon.disable_all_invariants_SWITCH.equals(option_name)) {
+            // There are two possibilities:
+            //  * a given invariant class is not yet loaded, in which case
+            //    we set the default value for its dkconfig_enabled field.
+            //  * a given invariant class is already loaded, in which case
+            //    we reflectively set its dkconfig_enabled to false.
+
+            // Set the default for not-yet-loaded invariants.
+            Invariant.invariantEnabledDefault = false;
+
+            // Get all loaded classes.  This solution is from
+            // http://stackoverflow.com/a/10261850/173852 .  Alternate approach:
+            // http://stackoverflow.com/questions/2548384/java-get-a-list-of-all-classes-loaded-in-the-jvm
+            Field f;
+            try {
+              f = ClassLoader.class.getDeclaredField("classes");
+            } catch (NoSuchFieldException e) {
+              throw new Daikon.BugInDaikon("Didn't find field ClassLoader.classes");
+            }
+            f.setAccessible(true);
+            Object classesAsObject;
+            try {
+              classesAsObject = f.get(Thread.currentThread().getContextClassLoader());
+            } catch (IllegalAccessException e) {
+              throw new Daikon.BugInDaikon("Field ClassLoader.classes was not made accessible");
+            }
+            @SuppressWarnings({
+              "unchecked", // type of ClassLoader.classes field is known
+              "nullness" // ClassLoader.classes is non-null
+            })
+            @NonNull List<Class<?>> classes = (List<Class<?>>) classesAsObject;
+            for (int i = 0; i < classes.size(); i++) {
+              Class<?> loadedClass = classes.get(i);
+              if (Invariant.class.isAssignableFrom(loadedClass)) {
+                @SuppressWarnings("unchecked") // loadedClass is a subclass of Invariant
+                Class<? extends Invariant> invType = (Class<? extends Invariant>) loadedClass;
+                try {
+                  Field field = invType.getField("dkconfig_enabled");
+                  if (field.getType() != Boolean.TYPE) {
+                    throw new Daikon.BugInDaikon(
+                        "Field "
+                            + invType
+                            + ".dkconfig_enabled has type "
+                            + field.getType()
+                            + " instead of boolean");
+                  } else {
+                    field.set(null, false);
+                    // System.out.println(
+                    //     "Set field "
+                    //         + invType
+                    //         + ".dkconfig_enabled to false");
+                  }
+                } catch (NoSuchFieldException e) {
+                  // System.out.println(
+                  //     "Class " + invType + " does not have a dkconfig_enabled field");
+                } catch (IllegalAccessException e) {
+                  throw new Daikon.BugInDaikon(
+                      "IllegalAccessException for field " + invType + ".dkconfig_enabled");
+                }
+              }
+            }
+          } else if (Daikon.no_dataflow_hierarchy_SWITCH.equals(option_name)) {
+            Daikon.use_dataflow_hierarchy = false;
+          } else if (Daikon.suppress_redundant_SWITCH.equals(option_name)) {
+            Daikon.suppress_redundant_invariants_with_simplify = true;
+          }
+
+          // Process only part of the trace file
+          else if (Daikon.ppt_regexp_SWITCH.equals(option_name)) {
+            if (Daikon.ppt_regexp != null) {
+              throw new Daikon.UserError(
+                  "multiple --"
+                      + Daikon.ppt_regexp_SWITCH
+                      + " regular expressions supplied on command line");
+            }
+            String regexp_string = Daikon.getOptarg(g);
+            if (!RegexUtil.isRegex(regexp_string)) {
+              throw new Daikon.UserError(
+                  "Bad regexp "
+                      + regexp_string
+                      + " for "
+                      + Daikon.ppt_regexp_SWITCH
+                      + ": "
+                      + RegexUtil.regexError(regexp_string));
+            }
+            Daikon.ppt_regexp = Pattern.compile(regexp_string);
+            break;
+          } else if (Daikon.ppt_omit_regexp_SWITCH.equals(option_name)) {
+            if (Daikon.ppt_omit_regexp != null) {
+              throw new Daikon.UserError(
+                  "multiple --"
+                      + Daikon.ppt_omit_regexp_SWITCH
+                      + " regular expressions supplied on command line");
+            }
+            String regexp_string = Daikon.getOptarg(g);
+            if (!RegexUtil.isRegex(regexp_string)) {
+              throw new Daikon.UserError(
+                  "Bad regexp "
+                      + regexp_string
+                      + " for "
+                      + Daikon.ppt_omit_regexp_SWITCH
+                      + ": "
+                      + RegexUtil.regexError(regexp_string));
+            }
+            Daikon.ppt_omit_regexp = Pattern.compile(regexp_string);
+            break;
+          } else if (Daikon.var_regexp_SWITCH.equals(option_name)) {
+            if (Daikon.var_regexp != null) {
+              throw new Daikon.UserError(
+                  "multiple --"
+                      + Daikon.var_regexp_SWITCH
+                      + " regular expressions supplied on command line");
+            }
+            String regexp_string = Daikon.getOptarg(g);
+            if (!RegexUtil.isRegex(regexp_string)) {
+              throw new Daikon.UserError(
+                  "Bad regexp "
+                      + regexp_string
+                      + " for "
+                      + Daikon.var_regexp_SWITCH
+                      + ": "
+                      + RegexUtil.regexError(regexp_string));
+            }
+            Daikon.var_regexp = Pattern.compile(regexp_string);
+            break;
+          } else if (Daikon.var_omit_regexp_SWITCH.equals(option_name)) {
+            if (Daikon.var_omit_regexp != null) {
+              throw new Daikon.UserError(
+                  "multiple --"
+                      + Daikon.var_omit_regexp_SWITCH
+                      + " regular expressions supplied on command line");
+            }
+            String regexp_string = Daikon.getOptarg(g);
+            if (!RegexUtil.isRegex(regexp_string)) {
+              throw new Daikon.UserError(
+                  "Bad regexp "
+                      + regexp_string
+                      + " for "
+                      + Daikon.var_omit_regexp_SWITCH
+                      + ": "
+                      + RegexUtil.regexError(regexp_string));
+            }
+            Daikon.var_omit_regexp = Pattern.compile(regexp_string);
+            break;
+          } else if (Daikon.server_SWITCH.equals(option_name)) {
+            String input_dir = Daikon.getOptarg(g);
+            Daikon.server_dir = new File(input_dir);
+            if (!Daikon.server_dir.isDirectory()
+                || !Daikon.server_dir.canRead()
+                || !Daikon.server_dir.canWrite()) {
+              throw new RuntimeException(
+                  "Could not open config file in server directory " + Daikon.server_dir);
+            }
+            break;
+
+            // Configuration options
+
+          } else if (Daikon.config_SWITCH.equals(option_name)) {
+            String config_file = Daikon.getOptarg(g);
+            try {
+              InputStream stream = new FileInputStream(config_file);
+              Configuration.getInstance().apply(stream);
+            } catch (IOException e) {
+              throw new Daikon.UserError(
+                  // Is this the only possible reason for an IOException?
+                  "Could not open config file " + config_file);
+            }
+            break;
+          } else if (Daikon.config_option_SWITCH.equals(option_name)) {
+            String item = Daikon.getOptarg(g);
+            try {
+              Configuration.getInstance().apply(item);
+            } catch (daikon.config.Configuration.ConfigException e) {
+              throw new Daikon.UserError(e);
+            }
+            break;
+          } else if (Daikon.debugAll_SWITCH.equals(option_name)) {
+            Global.debugAll = true;
+          } else if (Daikon.debug_SWITCH.equals(option_name)) {
+            LogHelper.setLevel(Daikon.getOptarg(g), LogHelper.FINE);
+          } else if (Daikon.track_SWITCH.equals(option_name)) {
+            LogHelper.setLevel("daikon.Debug", LogHelper.FINE);
+            String error = Debug.add_track(Daikon.getOptarg(g));
+            if (error != null) {
+              throw new Daikon.UserError(
+                  "Error parsing track argument '" + Daikon.getOptarg(g) + "' - " + error);
+            }
+          } else if (Daikon.disc_reason_SWITCH.equals(option_name)) {
+            try {
+              PrintInvariants.discReasonSetup(Daikon.getOptarg(g));
+            } catch (IllegalArgumentException e) {
+              throw new Daikon.UserError(e);
+            }
+          } else if (Daikon.mem_stat_SWITCH.equals(option_name)) {
+            Daikon.use_mem_monitor = true;
+          } else {
+            throw new Daikon.UserError("Unknown option " + option_name + " on command line");
+          }
+          break;
+        case 'h':
+          System.out.println(usage);
+          throw new Daikon.NormalTermination();
+        case 'o':
+          String inv_filename = Daikon.getOptarg(g);
+
+          if (Daikon.inv_file != null) {
+            throw new Daikon.UserError(
+                "multiple serialization output files supplied on command line: "
+                    + Daikon.inv_file
+                    + " "
+                    + inv_filename);
+          }
+
+          Daikon.inv_file = new File(inv_filename);
+
+          if (!UtilPlume.canCreateAndWrite(Daikon.inv_file)) {
+            throw new Daikon.UserError(
+                "Cannot write to serialization output file " + Daikon.inv_file);
+          }
+          break;
+          //
+        case '?':
+          // break; // getopt() already printed an error
+          System.out.println(usage);
+          throw new Daikon.NormalTermination();
+          //
+        default:
+          throw new Daikon.BugInDaikon("getopt() returned " + c);
+      }
+    }
+
+    // This code is duplicated above within the switch processing.
+    // First check that all the file names are OK, so we don't do lots of
+    // processing only to bail out at the end.
+    for (int i = g.getOptind(); i < args.length; i++) {
+      String filename = args[i];
+      if (filename.equals("-") || filename.equals("+")) {
+        dtrace_files.add(filename);
+        continue;
+      }
+
+      File file = new File(filename);
+      if (!file.exists()) {
+        throw new Daikon.UserError("File " + file + " not found.");
+      }
+      filename = file.toString();
+
+      // These aren't "endsWith()" because there might be a suffix on the end
+      // (eg, a date or ".gz").
+      if (filename.indexOf(".decls") != -1) {
+        decl_files.add(file);
+      } else if (filename.indexOf(".dtrace") != -1) {
+        dtrace_files.add(filename);
+        // Always output an invariant file by default, even if none is
+        // specified on the command line.
+        if (Daikon.inv_file == null) {
+          String basename;
+          // This puts the .inv file in the current directory.
+          basename = new File(filename).getName();
+          // This puts the .inv file in the same directory as the .dtrace file.
+          // basename = filename;
+          int base_end = basename.indexOf(".dtrace");
+          String inv_filename = basename.substring(0, base_end) + ".inv.gz";
+
+          Daikon.inv_file = new File(inv_filename);
+          if (!UtilPlume.canCreateAndWrite(Daikon.inv_file)) {
+            throw new Daikon.UserError("Cannot write to file " + Daikon.inv_file);
+          }
+        }
+      } else if (filename.indexOf(".spinfo") != -1) {
+        spinfo_files.add(file);
+      } else if (filename.indexOf(".map") != -1) {
+        map_files.add(file);
+      } else {
+        throw new Daikon.UserError("Unrecognized file type: " + file);
+      }
+    }
+
+    // Set the fuzzy float comparison ratio.  This needs to be done after
+    // any configuration options (which may set the ratio) are processed.
+    Global.fuzzy.setRelativeRatio(Invariant.dkconfig_fuzzy_ratio);
+
+    // Setup ppt_max_name based on the specified percentage of ppts to process
+    if (Daikon.dkconfig_ppt_perc != 100) {
+      Daikon.ppt_max_name = Daikon.setup_ppt_perc(decl_files, Daikon.dkconfig_ppt_perc);
+      System.out.println("Max ppt name = " + Daikon.ppt_max_name);
+    }
+
+    // Validate guardNulls option
+    PrintInvariants.validateGuardNulls();
+
+    return new Daikon.FileOptions(decl_files, dtrace_files, spinfo_files, map_files);
   }
 
   /**
@@ -658,8 +1132,6 @@ public class DataGen {
             if (inv.ppt instanceof PptSlice2) assert inv.ppt.var_infos.length == 2;
             InvariantStatus status = inv.add_sample(vt, 1);
             debug.fine(inv + ": " + status + " at " + ppt.name);
-            debug.fine("csv file: " + ppt.csv_file_name);
-            // CSVWriter csv_writer = new CSVWriter(new FileWriter(new File(ppt.csv_file_name)));
             if (status == InvariantStatus.FALSIFIED) {
               row.add(new PredValPair(inv, false));
               // k.remove();
@@ -680,6 +1152,9 @@ public class DataGen {
       }
 
       // write a row to a csv file
+      csvMan.getCSVFile(ppt);
+      debug.fine("csv file: " + ppt.csv_file_name);
+      // CSVWriter csv_writer = new CSVWriter(new FileWriter(new File(ppt.csv_file_name)));
       for (PredValPair p : row) {
         debug.fine("write inv ID " + invIDMan.getID(p.pred()) + ": " + p);
       }
@@ -696,6 +1171,13 @@ public class DataGen {
 
       id_map.put(inv, last_id);
       return last_id++;
+    }
+  }
+
+  public static class CSVManager {
+
+    File getCSVFile(PptTopLevel ppt) {
+      return new File(ppt.csv_file_name);
     }
   }
 }
