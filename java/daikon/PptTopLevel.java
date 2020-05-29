@@ -418,9 +418,9 @@ public class PptTopLevel extends Ppt {
 
     this.csv_file_name =
         name.replaceAll("\\.", "_")
-                .replaceAll("\\(", "_")
-                .replaceAll("\\)", "_")
-                .replaceAll(":::", "")
+                .replaceAll("\\(", "_LP_")
+                .replaceAll("\\)", "_RP_")
+                .replaceAll(":::", "_AT_")
             + ".csv";
 
     this.flags = flags;
@@ -450,9 +450,9 @@ public class PptTopLevel extends Ppt {
     ppt_name = new PptName(name);
     this.csv_file_name =
         name.replaceAll("\\.", "_")
-                .replaceAll("\\(", "_")
-                .replaceAll("\\)", "_")
-                .replaceAll(":::", "")
+                .replaceAll("\\(", "_LP_")
+                .replaceAll("\\)", "_RP_")
+                .replaceAll(":::", "_AT_")
             + ".csv";
     init_vars();
   }
