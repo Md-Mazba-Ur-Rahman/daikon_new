@@ -13,6 +13,7 @@ import gnu.getopt.LongOpt;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -28,6 +29,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -64,6 +67,9 @@ public class DataGen {
   // // inv file for storing the invariants in serialized form
   // public static File inv_file = null;
 
+  // Command-line options / command-line arguments
+  public static final String output_data_dir_OPTION = "out-dir";
+
   private static String usage =
       String.join(
           lineSep,
@@ -71,6 +77,8 @@ public class DataGen {
           "Usage: java daikon.DataGen [OPTION]... <decls_file> <dtrace_file>",
           "  -h, --" + Daikon.help_SWITCH,
           "      Display this usage message",
+          "  --" + output_data_dir_OPTION + " dir",
+          "      Dir where output data is stored",
           // "  -o, <inv_file> ",
           // "      Writes output to <inv_file>",
           "  --" + Daikon.debugAll_SWITCH,
@@ -83,8 +91,9 @@ public class DataGen {
   // a pptMap that contains all the program points
   public static PptMap all_ppts;
 
+  public static String output_data_dir;
+
   public static InvIDManager invIDMan = new InvIDManager();
-  public static CSVManager csvMan = new CSVManager();
 
   public static void main(final String[] args) throws IOException, FileNotFoundException {
 
@@ -245,6 +254,8 @@ public class DataGen {
           new LongOpt(Daikon.track_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
           new LongOpt(Daikon.disc_reason_SWITCH, LongOpt.REQUIRED_ARGUMENT, null, 0),
           new LongOpt(Daikon.mem_stat_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
+          // DateGen configuration
+          new LongOpt(output_data_dir_OPTION, LongOpt.REQUIRED_ARGUMENT, null, 0)
         };
     Getopt g = new Getopt("daikon.Daikon", args, "ho:", longopts);
     int c;
@@ -551,6 +562,10 @@ public class DataGen {
             }
           } else if (Daikon.mem_stat_SWITCH.equals(option_name)) {
             Daikon.use_mem_monitor = true;
+          } else if (output_data_dir_OPTION.equals(option_name)) {
+            output_data_dir = Daikon.getOptarg(g);
+            File dir = new File(output_data_dir);
+            if (!dir.exists()) dir.mkdir();
           } else {
             throw new Daikon.UserError("Unknown option " + option_name + " on command line");
           }
@@ -1152,11 +1167,13 @@ public class DataGen {
       }
 
       // write a row to a csv file
-      csvMan.getCSVFile(ppt);
-      debug.fine("csv file: " + ppt.csv_file_name);
-      // CSVWriter csv_writer = new CSVWriter(new FileWriter(new File(ppt.csv_file_name)));
-      for (PredValPair p : row) {
-        debug.fine("write inv ID " + invIDMan.getID(p.pred()) + ": " + p);
+      try (CSVPrinter printer =
+          new CSVPrinter(
+              new FileWriter(new File(output_data_dir, ppt.csv_file_name), true),
+              CSVFormat.DEFAULT)) {
+        printer.printRecord(row);
+      } catch (IOException e) {
+        throw new Error("IO exception for " + output_data_dir + "/" + ppt.csv_file_name);
       }
     }
   }
@@ -1171,13 +1188,6 @@ public class DataGen {
 
       id_map.put(inv, last_id);
       return last_id++;
-    }
-  }
-
-  public static class CSVManager {
-
-    File getCSVFile(PptTopLevel ppt) {
-      return new File(ppt.csv_file_name);
     }
   }
 }
