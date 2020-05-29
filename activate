@@ -1,3 +1,4 @@
 export DAIKONDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+export CLASSPATH=${CLASSPATH}:$DAIKONDIR/java:$DAIKONDIR/daikon.jar:$DAIKONDIR/java/commons-csv-1.8.jar
 source $DAIKONDIR/scripts/daikon.bashrc
 
