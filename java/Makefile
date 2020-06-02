@@ -73,7 +73,7 @@ ifneq "$(wildcard ${JAVA_HOME}/jre/lib/rt.jar)" ""
 endif
 
 ## Add commons-csv
-DAIKON_CLASSPATH := $(DAIKON_CLASSPATH):${DAIKONDIR}/java/commons-csv-1.8.jar:${DAIKONDIR}/java/commons-csv-1.8-sources.jar
+DAIKON_CLASSPATH := $(DAIKON_CLASSPATH):${DAIKONDIR}/java/commons-csv-1.8.jar:${DAIKONDIR}/java/commons-csv-1.8-sources.jar:${DAIKONDIR}/java/commons-io-2.7.jar:${DAIKONDIR}/java/commons-io-2.7-sources.jar
 
 # -docletpath doesn't seem to respect path wildcards as -cp does
 DOCLETPATH := $(wildcard ${DAIKONDIR}/java/lib/plume-util-*.jar):$(wildcard ${DAIKONDIR}/java/lib/bcel-util-*.jar):$(wildcard ${DAIKONDIR}/java/lib/reflection-util-*.jar):$(wildcard ${DAIKONDIR}/java/lib/require-javadoc-*.jar):${DAIKON_CLASSPATH}:${DAIKONDIR}/java/lib/daikon-plumelib.jar
