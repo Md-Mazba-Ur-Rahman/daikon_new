@@ -1180,9 +1180,20 @@ public class DataGen {
           });
 
       List<String> row = new ArrayList<>();
+      int pred_idx = 0;
       for (PredIDValPair pair : snapshot) {
-        row.add("P_" + pair.pred_id());
-        row.add(Integer.toString(pair.val()));
+        assert pred_idx <= pair.pred_id();
+        if (pred_idx == pair.pred_id()) {
+          row.add(Integer.toString(pair.val()));
+          pred_idx++;
+        } else if (pred_idx < pair.pred_id()) {
+          for (; pred_idx < pair.pred_id(); pred_idx++) {
+            row.add("-");
+          }
+          row.add(Integer.toString(pair.val()));
+        } else {
+          throw new Error(pred_idx + " should not be larger than " + pair.pred_id());
+        }
       }
 
       // write a row to a csv file
@@ -1207,6 +1218,10 @@ public class DataGen {
 
       id_map.put(inv, last_id);
       return last_id++;
+    }
+
+    int getLastID() {
+      return last_id;
     }
   }
 }
