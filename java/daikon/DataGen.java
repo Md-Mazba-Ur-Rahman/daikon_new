@@ -41,6 +41,7 @@ import org.checkerframework.dataflow.qual.Pure;
 import org.plumelib.util.EntryReader;
 import org.plumelib.util.RegexUtil;
 import org.plumelib.util.UtilPlume;
+import org.apache.commons.io.FileUtils;
 
 /**
  * DaikonSimple reads a declaration file and trace file and outputs a list of likely invariants
@@ -565,10 +566,16 @@ public class DataGen {
           } else if (Daikon.mem_stat_SWITCH.equals(option_name)) {
             Daikon.use_mem_monitor = true;
           } else if (output_data_dir_OPTION.equals(option_name)) {
-            output_data_dir = Daikon.getOptarg(g);
-            File dir = new File(output_data_dir);
-            if (dir.exists()) dir.delete();
-            dir.mkdir();
+            try {
+              output_data_dir = Daikon.getOptarg(g);
+              File dir = new File(output_data_dir);
+              if (dir.exists()) {
+                FileUtils.deleteDirectory(dir);
+              }
+              dir.mkdir();
+            } catch (IOException e) {
+              throw new Daikon.UserError(e);
+            }
           } else {
             throw new Daikon.UserError("Unknown option " + option_name + " on command line");
           }
